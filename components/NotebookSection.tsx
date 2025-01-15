@@ -34,6 +34,10 @@ type NotebookEntry = {
   isLoading: boolean;
   showDetails: boolean;
   showSources: boolean;
+  // New fields for retrieval details
+  analysis?: string;
+  sources?: string;
+  searchQueriesUsed?: string;
 }
 
 const options = [
@@ -140,10 +144,37 @@ export function NotebookSection() {
         console.log('Sending API request:', { command, type: selectedOption, entryId: newEntry.id });
         const response = await fetchFromAPI(command, selectedOption, newEntry.id);
         console.log('Received API response:', response);
+
+        let parsedAnalysis = '';
+        let parsedSources = '';
+        let parsedSearchQueries = '';
+        let finalContent = response.content;
+
+        if (selectedOption === 'retrieval') {
+          // Attempt to parse JSON if retrieval
+          try {
+            const parsed = JSON.parse(response.content);
+            parsedAnalysis = parsed.analysis || '';
+            parsedSources = parsed.sources || '';
+            parsedSearchQueries = parsed.searchQueriesUsed || '';
+            // We can set finalContent to the analysis text for direct display
+            finalContent = parsedAnalysis;
+          } catch (err) {
+            console.error('Failed to parse retrieval JSON. Fallback to raw content.', err);
+          }
+        }
+
         setEntries(currentEntries =>
           currentEntries.map(entry =>
             entry.id === newEntry.id
-              ? { ...entry, isLoading: false, content: response.content }
+              ? {
+                  ...entry,
+                  isLoading: false,
+                  content: finalContent,
+                  analysis: parsedAnalysis,
+                  sources: parsedSources,
+                  searchQueriesUsed: parsedSearchQueries
+                }
               : entry
           )
         );
@@ -221,7 +252,14 @@ export function NotebookSection() {
             </Button>
             {entry.showDetails && (
               <div className="mx-6 mb-3 text-xs text-muted-foreground">
-                <p>Reasoning: {entry.option}</p>
+                {entry.option === 'retrieval' ? (
+                  <>
+                    <p><strong>Search Queries Used:</strong></p>
+                    <p className="whitespace-pre-wrap">{entry.searchQueriesUsed || '(none)'}</p>
+                  </>
+                ) : (
+                  <p>Reasoning: {entry.option}</p>
+                )}
               </div>
             )}
             {entry.isLoading ? (
@@ -253,9 +291,22 @@ export function NotebookSection() {
                   </Button>
                   {entry.showSources && (
                     <div className="mt-2 text-xs text-muted-foreground">
-                      <p><strong>Type:</strong> {entry.option}</p>
-                      <p><strong>Entry ID:</strong> {entry.id}</p>
-                      <p><strong>Command:</strong> {entry.command}</p>
+                      {entry.option === 'retrieval' ? (
+                        <>
+                          <p><strong>Sources:</strong></p>
+                          <p className="whitespace-pre-wrap">{entry.sources || '(none)'}</p>
+                          <br />
+                          <p><strong>Type:</strong> {entry.option}</p>
+                          <p><strong>Entry ID:</strong> {entry.id}</p>
+                          <p><strong>Command:</strong> {entry.command}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p><strong>Type:</strong> {entry.option}</p>
+                          <p><strong>Entry ID:</strong> {entry.id}</p>
+                          <p><strong>Command:</strong> {entry.command}</p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
